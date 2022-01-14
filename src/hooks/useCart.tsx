@@ -43,8 +43,8 @@ export function CartProvider({ children }: CartProviderProps): JSX.Element {
     console.log("useEffect");
   }, [cart]);
 
+  // Verifica se há estoque do produto solicitado retornando um boolean
   async function haveStock(productId: number, amount: number) {
-    // Fetch stock dos produtos
     const stock: Stock = (await api.get(`/stock/${productId}`)).data;
     if (stock.amount < amount) {
       toast.error("Quantidade solicitada fora de estoque");
@@ -59,12 +59,12 @@ export function CartProvider({ children }: CartProviderProps): JSX.Element {
       const productToAdd = (await api.get(`/products/${productId}`)).data;
 
       // Verifica se existe um produto no carrinho
+      const alreadyInCart =
+        cart.findIndex((product: Product) => product.id === productId) !== -1;
+
       const addedProductIndexInCart = cart.findIndex(
         (product: Product) => product.id === productId
       );
-
-      const alreadyInCart =
-        cart.findIndex((product: Product) => product.id === productId) !== -1;
 
       // Caso já exista produto no cart, chamar updateProductAmount, caso não, adicionar o produto no cart.
       if (alreadyInCart) {
@@ -75,12 +75,14 @@ export function CartProvider({ children }: CartProviderProps): JSX.Element {
         console.log(productToAdd);
         updateProductAmount(newAmount);
       } else {
+        // Caso não exista produto no cart, adicionar um novo no mesmo.
         if (await haveStock(productId, 1)) {
           productToAdd.amount = 1;
           setCart((prevCart) => [...prevCart, productToAdd]);
         }
       }
     } catch (e: any) {
+      //Tentativa de passar no test "should not be able add a product that does not exist"
       const promiseError = "Request failed with status code 404";
       if (e.message === promiseError) {
         toast.error("Erro na adição do produto");
