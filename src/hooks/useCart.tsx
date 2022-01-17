@@ -4,6 +4,7 @@ import {
   useContext,
   useEffect,
   useState,
+  useRef,
 } from "react";
 import { toast } from "react-toastify";
 import { api } from "../services/api";
@@ -38,10 +39,24 @@ export function CartProvider({ children }: CartProviderProps): JSX.Element {
     return [];
   });
 
+  // Cria uma ref utilizada para verificar se o cart foi ou não alterado apartir de indefinido ou nulo.
+  const prevCartRef = useRef<Product[]>();
+
   useEffect(() => {
-    localStorage.setItem("@RocketShoes:cart", JSON.stringify(cart));
+    prevCartRef.current = cart;
+  });
+
+  // Essa comparação usando o ?? (nullish coalescing) que retorna o segundo valor caso o primeiro seja nulo ou indefinido
+  const cartPreviousValue = prevCartRef.current ?? cart;
+
+  useEffect(() => {
+    // Dessa forma o localStorage não é alterado no useEffect inicial, quando o valor do state é setado para o padrão.
+    if (cartPreviousValue !== cart) {
+      localStorage.setItem("@RocketShoes:cart", JSON.stringify(cart));
+    }
+
     console.log("useEffect");
-  }, [cart]);
+  }, [cart, cartPreviousValue]);
 
   // Verifica se há estoque do produto solicitado retornando um boolean
   async function haveStock(productId: number, amount: number) {
@@ -90,42 +105,52 @@ export function CartProvider({ children }: CartProviderProps): JSX.Element {
     }
   };
 
+  // Função que remove o produto
   const removeProduct = (productId: number) => {
+    // Verifica a existência do produto no cart
+    const productIndexInCart = cart.findIndex(
+      (product) => productId === product.id
+    );
     try {
-      let newCart: Product[] = [];
-      cart.forEach((product) => {
-        if (product.id !== productId) {
-          newCart.push(product);
-        }
-      });
+      if (productIndexInCart !== -1) {
+        let newCart: Product[] = [];
+        cart.forEach((product) => {
+          if (product.id !== productId) {
+            newCart.push(product);
+          }
+        });
 
-      setCart(newCart);
+        setCart(newCart);
+      } else throw new Error();
     } catch {
       toast.error("Erro na remoção do produto");
     }
   };
 
+  // Função que atuliza a quantidade de produtos
   const updateProductAmount = async ({
     productId,
     amount,
   }: UpdateProductAmount) => {
     try {
-      if (await haveStock(productId, amount)) {
-        let updatedCart: Product[] = [];
-        cart.forEach((product) => {
-          if (product.id === productId) {
-            const updatedProduct = {
-              id: product.id,
-              title: product.title,
-              price: product.price,
-              image: product.image,
-              amount: amount,
-            };
-            updatedCart.push(updatedProduct);
-          } else updatedCart.push(product);
-        });
+      if (amount >= 1) {
+        if (await haveStock(productId, amount)) {
+          let updatedCart: Product[] = [];
+          cart.forEach((product) => {
+            if (product.id === productId) {
+              const updatedProduct = {
+                id: product.id,
+                title: product.title,
+                price: product.price,
+                image: product.image,
+                amount: amount,
+              };
+              updatedCart.push(updatedProduct);
+            } else updatedCart.push(product);
+          });
 
-        setCart(updatedCart);
+          setCart(updatedCart);
+        }
       }
     } catch {
       toast.error("Erro na alteração de quantidade do produto");
